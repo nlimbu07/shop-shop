@@ -2,6 +2,12 @@ import {
   UPDATE_PRODUCTS,
   UPDATE_CATEGORIES,
   UPDATE_CURRENT_CATEGORY,
+  ADD_TO_CART,
+  ADD_MULTIPLE_TO_CART,
+  REMOVE_FROM_CART,
+  UPDATE_CART_QUANTITY,
+  CLEAR_CART,
+  TOGGLE_CART,
 } from './actions';
 // The useReducer() Hook is meant specifically for managing a greater level of state
 import { useReducer } from 'react';
@@ -28,14 +34,63 @@ export const reducer = (state, action) => {
         currentCategory: action.currentCategory,
       };
 
+    case ADD_TO_CART:
+      return {
+        ...state,
+        cartOpen: true,
+        cart: [...state.cart, action.product],
+      };
+
+    case ADD_MULTIPLE_TO_CART:
+      return {
+        ...state,
+        cart: [...state.cart, ...action.products],
+      };
+
+    case REMOVE_FROM_CART:
+      let newState = state.cart.filter((product) => {
+        return product._id !== action._id;
+      });
+
+      return {
+        ...state,
+        cartOpen: newState.length > 0,
+        cart: newState,
+      };
+
+    case UPDATE_CART_QUANTITY:
+      return {
+        ...state,
+        cartOpen: true,
+        cart: state.cart.map((product) => {
+          if (action._id === product._id) {
+            product.purchaseQuantity = action.purchaseQuantity;
+          }
+          return product;
+        }),
+      };
+
+    case CLEAR_CART:
+      return {
+        ...state,
+        cartOpen: false,
+        cart: [],
+      };
+
+    case TOGGLE_CART:
+      return {
+        ...state,
+        cartOpen: !state.cartOpen,
+      };
+
     // if it's none of these actions, do not update state at all and keep things the same!
     default:
       return state;
   }
 };
 
-// will be used to help initialize our global state object and then provide us with the functionality for 
+// will be used to help initialize our global state object and then provide us with the functionality for
 // updating that state by automatically running it through our custom reducer() function
-export function useProductReducer(initialState){
-    return useReducer(reducer, initialState);
+export function useProductReducer(initialState) {
+  return useReducer(reducer, initialState);
 }
