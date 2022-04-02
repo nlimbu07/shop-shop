@@ -6,10 +6,20 @@ import './style.css';
 import { useStoreContext } from '../../utils/GlobalState';
 import { TOGGLE_CART, ADD_MULTIPLE_TO_CART } from '../../utils/actions';
 import { idbPromise } from '../../utils/helpers';
+import { QUERY_CHECKOUT } from '../../utils/queries';
+import { loadStripe } from '@stripe/stripe-js';
+import { useLazyQuery } from '@apollo/client';
 
 const Cart = () => {
   // You'll use the custom useStoreContext Hook to establish a state variable and the dispatch() function to update the state
   const [state, dispatch] = useStoreContext();
+
+  // use this stripePromise object to perform the checkout redirect.
+  // But first, we need to collect the IDs for the items being purchased.
+  const stripePromise = loadStripe('pk_test_TYooMQauvdEDq54NiTphI7jx');
+
+  // The data variable will contain the checkout session, but only after the query is called with the getCheckout() function.
+  const [getCheckout, { data }] = useLazyQuery(QUERY_CHECKOUT);
 
   // to check if there's anything in the state's cart property on load. If not, we'll retrieve data from the IndexedDB cart object store.
   // we're checking to see if state.cart.length is 0, then executing getCart() to retrieve the items from the cart object store and save it to the global state object.
@@ -25,6 +35,15 @@ const Cart = () => {
       getCart();
     }
   }, [state.cart.length, dispatch]);
+
+  // add another useEffect Hook to watch for changes to data. We'll use the stripePromise object to redirect to Stripe once the data variable has data in it.
+  useEffect(() => {
+    if (data) {
+      stripePromise.then((res) => {
+        res.redirectToCheckout({ sessionId: data.checkout.session });
+      });
+    }
+  }, [data]);
 
   function toggleCart() {
     dispatch({ type: TOGGLE_CART });
@@ -49,7 +68,21 @@ const Cart = () => {
     );
   }
 
-  console.log(state);
+  // When the user clicks Checkout, this function will loop over the items saved in state.cart and add their IDs to a new productIds array.
+  // This productIds array is what the QUERY_CHECKOUT query would need to generate the Stripe session.
+  function submitCheckout() {
+    const productIds = [];
+
+    getCheckout({
+      variables: { products: productIds },
+    });
+
+    state.cart.forEach((item) => {
+      for (let i = 0; i < item.purchaseQuantity; i++) {
+        productIds.push(item._id);
+      }
+    });
+  }
 
   return (
     <div className='cart'>
@@ -67,7 +100,7 @@ const Cart = () => {
           <div className='flex-row space-between'>
             <strong>Total: ${calculateTotal()}</strong>
             {Auth.loggedIn() ? (
-              <button>Checkout</button>
+              <button onClick={submitCheckout}>Checkout</button>
             ) : (
               <span>(log in to check out)</span>
             )}
